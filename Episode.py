@@ -6,7 +6,9 @@ Created on Fri Jun 25 22:53:09 2021
 """
 
 import os
+import time
 import numpy as np
+from matplotlib import pyplot as plt
 from Trial import Trial
 
 class Episode:
@@ -23,8 +25,8 @@ class Episode:
         dirs = os.listdir(path)
         #print(dirs)
         
-        self.PWM = []
-        self.files = []
+        # self.PWM = []
+        # self.files = []
         for exp_folder in dirs: # file name with PWM commands
             # get the PWM commands
             folder_name = exp_folder.split('_')
@@ -41,16 +43,17 @@ class Episode:
     def findAllTrials(self): # find all trials for one extension state
         # 3rd class
         exp_type_dirs = os.listdir(self.extension_root_dir)
-        #print(exp_type_dirs)
+        # print("exp_type_dirs: ", exp_type_dirs)
         for exp_type_dir in exp_type_dirs:
             exp_type_path = self.extension_root_dir + exp_type_dir + "/"
             if os.path.isdir(exp_type_path):
                 # 4th class
                 exp_dirs = os.listdir(exp_type_path)
-                #print(exp_dirs)
+                # print("exp_dirs", exp_dirs)
                 for exp_dir in exp_dirs:
                     self.expFiles(exp_type_path + exp_dir + "/")
-        #print(self.files)
+        # print("self.files: ", self.files)
+        # print(len(self.files))
         #print()
         
     def setParameters(self, parameters): # parameters is a list with 6 elements
@@ -58,15 +61,23 @@ class Episode:
         
     def run(self):
         self.findAllTrials()
-        error = np.array([])
+        self.error_lst = np.array([])
         for file in self.files:
             #
             sim = Trial(file)
             sim.setParameters(self.parameters)
             sim.trial()
-            error = np.append(error, sim.error)
-        self.error = error.sum()
+            self.error_lst = np.append(self.error_lst, sim.error)
+        self.error = self.error_lst.sum()
         #print("Model error:  ", self.error)
+
+    def showFigures(self):
+        L = len(self.error_lst)
+        # print(L)
+        print(self.error_lst)
+        x = list(range(1, L+1))
+        plt.bar(x, self.error_lst)
+        plt.show()
     
 # Test script
 if __name__ == "__main__":
@@ -80,8 +91,12 @@ if __name__ == "__main__":
     file_name = "Take 2021-06-13 06.40.43 PM_013.csv"
     
     episode = Episode(root_dir + ext_dir[0])
-    episode.setParameters([40, 40, 12, 2, 2, 2])
+    # episode.setParameters([40, 40, 12, 2, 2, 2])
+    episode.setParameters([30, 60, 150, 50, 40, 60])
+    t1 = time.time()
     episode.run()
-    
-    
+    t2 = time.time()
+    print("error", episode.error)
+    print("used time: ", t2-t1)
+    episode.showFigures()
     

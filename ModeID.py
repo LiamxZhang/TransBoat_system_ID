@@ -9,8 +9,10 @@ import os
 import time
 import math
 import numpy as np
+from matplotlib import pyplot as plt
 import random
 from Episode import Episode
+import matlab.engine
 
 
 class ModeID:
@@ -21,6 +23,7 @@ class ModeID:
         self.N_para = 6 # Number of parameters
         #
         self.setBound(lbd, ubd)
+        self.error_lst = []
     
     def setBound(self,lbd, ubd):
         self.lower_bound = np.array(lbd)   # lower bounds: m1, m2, m3, d1, d2, d3
@@ -54,11 +57,12 @@ class ModeID:
                         for d2 in configs[4]:
                             for d3 in configs[5]:
                                 c = np.array([m1, m2, m3, d1, d2, d3])
+                                print("C: ", c)
                                 err = self.f(c) # get error
                                 if err <= err_min:
                                     self.config = c
                                     err_min = err
-                                
+                                self.error_lst.append(err_min)
                                 print("| Try config: ", self.config, " | Error: ", err_min)
         t2 = time.time()
         
@@ -139,8 +143,11 @@ class ModeID:
             j = 0
             while True:
                 j += 1
+                # store current value of error
+                err = self.f(x)
+                self.error_lst.append(err)
                 # Descent direction
-                d = - self.getGradient(self.f, x)
+                d = - getGradient(self.f, x)
                 print("| Step: ", j, " | d: ", d)
                 # Backtracking line search
                 t = 1
@@ -179,6 +186,17 @@ class ModeID:
                 print("--------- End Iteration ------------")
                 return err_min
     
+    def TRRsearch(self):
+        lb = matlab.double(list(self.lower_bound))
+        ub = matlab.double(list(self.upper_bound))
+
+        eng = matlab.engine.start_matlab()
+        rslt = eng.TRR_Solver(lb, ub)
+        config = np.array(rslt[0][0:6])
+        err_min = np.array(rslt[0][6])
+
+        return config, err_min
+
     def configInit(self):
         # Generate 6 random configs, return in a np array
         c = np.array([])
@@ -188,39 +206,83 @@ class ModeID:
         return c
     
     def f(self, config):  # get error
+        config = np.array(config)
         self.episode.setParameters(config.tolist())
         self.episode.run()
         return self.episode.error
-    
-    def getGradient(self, func, x):
-        # Calculate gradient at point x by differencing
-        delta = 0.001
-        grad_lst = np.zeros(self.N_para)
-        for i in range(self.N_para):
-            delta_x = np.zeros(self.N_para)
-            delta_x[i] = delta
-            f1 = func(x - delta_x)
-            f2 = func(x + delta_x)
-            grad = (f2 - f1) / (2 * delta)
-            grad_lst[i] = grad
-        return grad_lst
-    
     
     def ID(self, acc_digit): # main function
         # check whether config file exists
         #if not self.readConfig():
         if True:
             self.GDsearch(acc_digit)
+            # self.GDsearch()
+            # t1 = time.time()
+            # c, e = self.TRRsearch()
+            # e = self.BFsearch(acc_digit)
+            # self.config = c
+            # print("config: ", c)
+            print("config: ", self.config)
+            # print("error: ", e)
+            # t2 = time.time()
+            # print("Used time: ", t2-t1)
             # save to configuration file
-            np.savetxt("./Configurations/Extension_" + str(self.extension) + ".csv", self.config, delimiter=",")
+            # np.savetxt("./Configurations/Extension_" + str(self.extension) + ".csv", self.config, delimiter=",")
+
+    def showFigures(self):
+        L = len(self.error_lst)
+        x = list(range(1, L+1))
+        plt.plot(x, self.error_lst)
+        plt.show()
         
         
+def f(config):  # get error
+    config = np.array(config)
+    root_dir = "./Data/USV/"
+    ext_dir = ["Extension_0/", "Extension_10/", "Extension_20/", "Extension_30/", "Extension_40/", "Extension_50/"]
+    episode = Episode(root_dir + ext_dir[0])
+    episode.setParameters(config.tolist())
+    episode.run()
+    return episode.error
+
+def getGradient(func, x):
+    # Calculate gradient at point x by differencing
+    x = np.array(x)
+    delta = 0.01
+    N = 6
+    grad_lst = np.zeros(N)
+    for i in range(N):
+        delta_x = np.zeros(N)
+        delta_x[i] = delta
+        f1 = func(x - delta_x)
+        f2 = func(x + delta_x)
+        grad = (f2 - f1) / (2 * delta)
+        grad_lst[i] = grad
+    return grad_lst
+
+def getHessian(func, x):
+    # Calculate the Hessain matrix
+    x = np.array(x)
+    delta = 0.01
+    N = 6
+    hessian = np.zeros((N, N))
+    for i in range(N):
+        delta_x = np.zeros(N)
+        delta_x[i] = delta
+        f1 = getGradient(func, x-delta_x)
+        f2 = getGradient(func, x+delta_x)
+        h_row = (f2 - f1) / (2 * delta)
+        hessian[i, :] = h_row
+    return hessian
+
+
 # Test script
 if __name__ == "__main__":
     #
     root_dir = "./Data/USV/Extension_0/"
     
     lbd = [30., 30., 70., 1., 3., 2.]
-    ubd = [60., 60., 150., 50., 40., 60.]
+    ubd = [60., 60., 100., 5., 4., 6.]
     modeID = ModeID(root_dir, lbd, ubd)
     modeID.ID(0.01)
+    modeID.showFigures()

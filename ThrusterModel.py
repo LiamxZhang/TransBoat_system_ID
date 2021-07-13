@@ -144,7 +144,7 @@ class ThrusterModel:
         ax.set_xticklabels(list(range(pwm_l, pwm_h+1, 10)))
         #x_major_locator=MultipleLocator(10)
         #ax.xaxis.set_major_locator(x_major_locator)
-        #plt.show()
+        plt.show()
         # draw fitting curves
         
     #
@@ -194,19 +194,12 @@ class ThrusterModel:
 # Test script
 if __name__ == "__main__":    
     thruster = ThrusterModel(1)
-    thruster.showFigures()
-    thruster = ThrusterModel(2)
-    thruster.showFigures()
-    thruster = ThrusterModel(3)
-    thruster.showFigures()
-    thruster = ThrusterModel(4)
-    thruster.showFigures()
-    plt.show()
-    #PWM_T_pair = thruster.readCSV(file_name)
+    
+    # PWM_T_pair = thruster.readCSV(file_name)
     # plt.plot(thrust_lst)
-    #thruster.drawErrorBar(pwm, PWM_T_pair)
-    #thruster.drawBoxPlot(pwm, PWM_T_pair)
-    #thruster.drawAllData(PWM_T_pair, 43, 138)
-    #thruster.Regression()
-    #thruster.showFigures()
+    # thruster.drawErrorBar(pwm, PWM_T_pair)
+    # thruster.drawBoxPlot(pwm, PWM_T_pair)
+    # thruster.drawAllData(PWM_T_pair, 43, 138)
+    # thruster.Regression()
+    # thruster.showFigures()
     print(thruster.propulsion(90))

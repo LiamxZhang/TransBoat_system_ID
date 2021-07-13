@@ -29,7 +29,7 @@ class Trial:
         header = 7 # jump the header
         deque_length = 10 # jump the first data
         skip_sec = 1 # skip the first 1 second
-#        get_initial_state_flag = False # whether the initial state obtained
+        # get_initial_state_flag = False # whether the initial state obtained
         #
         self.t_lst = []
         
@@ -78,20 +78,20 @@ class Trial:
                 vel_w = (self.state_deque[-1][3] - self.state_deque[0][3])/delta_t
                 self.state_deque.pop(0)
                 
-#                if not get_initial_state_flag:
-#                    # calculate the speed for every 10 data
-#                    if data_i == 1:
-#                        init_x, init_y, init_w = x, y, w
-#                        t_last = t
-#                    elif data_i % 10 == 1:
-#                        delta_t = t - t_last
-#                        vel_x = (x-init_x)/delta_t
-#                        vel_y = (y-init_y)/delta_t
-#                        vel_w = (w-init_w)/delta_t
-#                        init_x = x
-#                        init_y = y
-#                        init_w = w
-#                        t_last = t
+            #    if not get_initial_state_flag:
+            #        # calculate the speed for every 10 data
+            #        if data_i == 1:
+            #            init_x, init_y, init_w = x, y, w
+            #            t_last = t
+            #        elif data_i % 10 == 1:
+            #            delta_t = t - t_last
+            #            vel_x = (x-init_x)/delta_t
+            #            vel_y = (y-init_y)/delta_t
+            #            vel_w = (w-init_w)/delta_t
+            #            init_x = x
+            #            init_y = y
+            #            init_w = w
+            #            t_last = t
                     
                 # skip the first second
                 if t <= skip_sec: 
@@ -107,14 +107,14 @@ class Trial:
                 self.vely_lst.append(vel_y)
                 self.velw_lst.append(vel_w)
                 
-#                if not get_initial_state_flag:
-#                    get_initial_state_flag = True
-#                    self.initial_state.append(x)
-#                    self.initial_state.append(y)
-#                    self.initial_state.append(w)
-#                    self.initial_state.append(vel_x)
-#                    self.initial_state.append(vel_y)
-#                    self.initial_state.append(vel_w)           
+            #    if not get_initial_state_flag:
+            #        get_initial_state_flag = True
+            #        self.initial_state.append(x)
+            #        self.initial_state.append(y)
+            #        self.initial_state.append(w)
+            #        self.initial_state.append(vel_x)
+            #        self.initial_state.append(vel_y)
+            #        self.initial_state.append(vel_w)           
         # x, y, w, velx, vely, velw
         self.initial_state = [self.x_lst[0], self.y_lst[0], self.w_lst[0],
                               self.velx_lst[0], self.vely_lst[0], self.velw_lst[0]] 
@@ -190,7 +190,7 @@ class Trial:
         USV.setMass(self.mass)
         USV.setDrag(self.drag)
         USV.pwmToPropulsion(self.PWM)
-        
+
         # simulation
         last_t = self.t_lst[0]
         for t in self.t_lst[1:]:
@@ -201,6 +201,9 @@ class Trial:
         # prepare data
         Vel_exp = [[i,j,k] for i,j,k in zip(self.velx_lst, self.vely_lst, self.velw_lst)]
         Vel_sim = USV.state_history[:, 3:6].tolist()
+        self.x_sim_lst = USV.state_history[:, 0].tolist()
+        self.y_sim_lst = USV.state_history[:, 1].tolist()
+        self.w_sim_lst = USV.state_history[:, 2].tolist()
         self.setErrorWeight(w)
         self.error = self.errorCalculation(Vel_exp, Vel_sim, self.errorWeight)
         #print(self.error)
@@ -227,8 +230,12 @@ class Trial:
         L = len(self.t_lst)
         for i in range(L):
             self.drawArrow(self.x_lst[i], self.y_lst[i], self.w_lst[i], arrow_scale, "b")
+            self.drawArrow(self.x_sim_lst[i], self.y_sim_lst[i], self.w_sim_lst[i],
+                            arrow_scale, "r")
             
-        plt.plot(self.x_lst, self.y_lst)
+        plt.plot(self.x_lst, self.y_lst, label="Experiment")
+        plt.plot(self.x_sim_lst, self.y_sim_lst, label="Simulation")
+        plt.legend()
         plt.show()
         
 # Test script
@@ -251,7 +258,9 @@ if __name__ == "__main__":
     #
     #sim.expFiles()
     #sim.readCSV(sim.files[0])
-    trial.setParameters([40, 40, 12, 2, 2, 2])
+    # trial.setParameters([40, 40, 12, 2, 2, 2])
+    trial.setParameters([30, 60, 150, 50, 40, 60])
     trial.trial()
+    print(trial.error)
     trial.showFigures()
     
