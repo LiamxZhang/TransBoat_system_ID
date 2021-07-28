@@ -215,15 +215,15 @@ class ModeID:
         # check whether config file exists
         #if not self.readConfig():
         if True:
-            self.GDsearch(acc_digit)
+            #self.GDsearch(acc_digit)
             # self.GDsearch()
             # t1 = time.time()
-            # c, e = self.TRRsearch()
+            c, e = self.TRRsearch()
             # e = self.BFsearch(acc_digit)
-            # self.config = c
+            self.config = c
             # print("config: ", c)
             print("config: ", self.config)
-            # print("error: ", e)
+            print("error: ", e)
             # t2 = time.time()
             # print("Used time: ", t2-t1)
             # save to configuration file

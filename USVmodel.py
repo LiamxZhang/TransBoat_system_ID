@@ -89,7 +89,7 @@ class USVmodel:
         # update velocity
         self.__updateCoriolis()
         M_inv = np.linalg.inv(self.Mass)
-        CDv = np.matmul((self.Coriolis+self.Drag), self.velocity)
+        CDv = np.matmul((self.Coriolis+self.Drag), self.bodyV)
         self.bodyV += T * (np.matmul(M_inv, self.propulsion - CDv))
         
         # update position
