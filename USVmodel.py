@@ -45,9 +45,11 @@ class USVmodel:
         e4 = self.extension
         self.B = np.array([[0, 1, 0, 1],
                            [1, 0, 1, 0],
-                           [-(e0+e1), -(e0+e2), e0+e3, e0+e4]])
+                           [-(e0+e1), -(e0+e2), (e0+e3), (e0+e4)]])
         p_array = np.transpose(np.array(prop))
         self.propulsion = np.matmul(self.B, p_array)
+        # print("prop: ", self.propulsion)
+        # print("prop2: ", np.matmul(self.R, self.propulsion))
     
     def pwmToPropulsion(self, pwm): # pwm is a list of 4 pwms
         if not 'self.thrusters' in locals().keys(): # if self.thrusters not exist
@@ -62,6 +64,8 @@ class USVmodel:
                 prop.append(self.thrusters[i].propulsion(pwm[i]))
         #        
         self.setPropulsion(prop)
+        # print("prop: ", prop)
+        # print("prop2: ", np.matmul(self.R, np.array(prop)))
         
     def setExtension(self, extension):
         self.extension = extension
@@ -80,15 +84,21 @@ class USVmodel:
     def __updateR(self):
         # transformation matrix
         w = self.position[2]
-        self.R = np.array([[math.cos(w), -math.sin(w), 0],
-                            [math.sin(w), math.cos(w), 0],
-                            [0, 0, 1]])
+        # self.R = np.array([[math.cos(w), -math.sin(w), 0],
+        #                     [math.sin(w), math.cos(w), 0],
+        #                     [0, 0, 1]])
+        self.R = np.array([[math.sin(np.pi/2 - w), math.cos(np.pi/2 - w), 0],
+                            [math.cos(np.pi/2 - w), -math.sin(np.pi/2 - w), 0],
+                            [0, 0, -1]])
     
     # update model
     def update(self, T=0.1): # T is the time interval
         # update velocity
         self.__updateCoriolis()
         M_inv = np.linalg.inv(self.Mass)
+        # print("Coriolis: ", self.Coriolis)
+        # print("Drag: ", self.Drag)
+        # print("bodyV: ", self.bodyV)
         CDv = np.matmul((self.Coriolis+self.Drag), self.bodyV)
         self.bodyV += T * (np.matmul(M_inv, self.propulsion - CDv))
         
@@ -96,6 +106,18 @@ class USVmodel:
         self.__updateR()
         self.velocity = np.matmul(self.R, self.bodyV)
         self.position += T * self.velocity
+
+        # orientation limit: [-pi, pi]
+        w_temp = self.position[2]
+        while w_temp > np.pi or w_temp < -np.pi:
+            # print("w_temp: ", w_temp)
+            t = int(w_temp / (2 * np.pi))
+            w_temp -= t * 2 * np.pi
+            if w_temp > np.pi:
+                w_temp -= 2 * np.pi
+            elif w_temp < -np.pi:
+                w_temp += 2 * np.pi
+        self.position[2] = w_temp
         
         # save to state history
         state = np.hstack((np.transpose(self.position), np.transpose(self.velocity)))

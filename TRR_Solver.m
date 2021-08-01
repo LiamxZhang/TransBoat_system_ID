@@ -9,6 +9,7 @@ nonlcon = []; % Nonlinear constraint
 x0 = lb; % Initial point at the lower bound
 options = optimoptions('fmincon','Algorithm','trust-region-reflective',...
     'SpecifyObjectiveGradient',true,'HessianFcn','objective');
+disp("Set options...");
 [C,e,exitflag,output] = ...
    fmincon(@HelperFunc,x0,A,b,Aeq,beq,lb,ub,nonlcon,options);
 rslt = [C, e];
@@ -26,6 +27,8 @@ end
 
 function [f, g, H] = HelperFunc(x)
 % Evaluate the function
+% config = [41.9, 41.9, x(1), 27.49, 27.49, x(2)];
+% x = config;
 f = py.ModeID.f(x);
 f = double(f);
 

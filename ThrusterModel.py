@@ -193,7 +193,7 @@ class ThrusterModel:
         
 # Test script
 if __name__ == "__main__":    
-    thruster = ThrusterModel(1)
+    thruster = ThrusterModel(4)
     
     # PWM_T_pair = thruster.readCSV(file_name)
     # plt.plot(thrust_lst)
@@ -202,4 +202,4 @@ if __name__ == "__main__":
     # thruster.drawAllData(PWM_T_pair, 43, 138)
     # thruster.Regression()
     # thruster.showFigures()
-    print(thruster.propulsion(90))
+    print(thruster.propulsion(60))

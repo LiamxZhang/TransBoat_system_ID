@@ -9,12 +9,14 @@ import csv
 import math
 import numpy as np
 from matplotlib import pyplot as plt
+from numpy.lib.twodim_base import tri
 from USVmodel import USVmodel
 
 
 class Trial: 
     # one single trial of experiment
     def __init__(self, path):
+        self.path = path
         # get the extension information
         self.extension = int(path.split("/")[3].split("_")[1])
         #print(self.extension)
@@ -22,9 +24,10 @@ class Trial:
         self.PWM = [int(i) for i in path.split("/")[6].split("_")[1::2]]
         #print(self.PWM)
         # get all data
-        self.readCSV(path)
+        t_e = 10   # time: s
+        self.readCSV(path, t_e)
     
-    def readCSV(self, file_path):
+    def readCSV(self, file_path, end_t = 10):
         # read csv files to obtain the initial state and the time list
         header = 7 # jump the header
         deque_length = 10 # jump the first data
@@ -62,7 +65,15 @@ class Trial:
                 
                 # prepare data
                 t = eval(row[1])
+
+                if t > end_t:
+                    # print("t = 10 s")
+                    self.t = end_t
+                    break
+
                 x, y, w = self.getXYW(row)
+                # if w < -1.5:
+                #     print("w: ", w, "\t row i: ", row_i, "\t t: ", t)
                 
                 # skip the first 10 data
                 if data_i <= deque_length:
@@ -75,7 +86,13 @@ class Trial:
                 delta_t = self.state_deque[-1][0] - self.state_deque[0][0]
                 vel_x = (self.state_deque[-1][1] - self.state_deque[0][1])/delta_t
                 vel_y = (self.state_deque[-1][2] - self.state_deque[0][2])/delta_t
-                vel_w = (self.state_deque[-1][3] - self.state_deque[0][3])/delta_t
+                diff = self.state_deque[-1][3] - self.state_deque[0][3]
+                if diff > np.pi:
+                    diff = -(2 * np.pi - diff)
+                elif diff < -np.pi:
+                    diff = -(-2 * np.pi - diff)
+                vel_w = diff/delta_t
+                # print("1: ", self.state_deque[-1][3], "\t 2: ", self.state_deque[0][3], "\t delta_t: ", delta_t, "\t vel_w: ", vel_w)
                 self.state_deque.pop(0)
                 
             #    if not get_initial_state_flag:
@@ -118,33 +135,41 @@ class Trial:
         # x, y, w, velx, vely, velw
         self.initial_state = [self.x_lst[0], self.y_lst[0], self.w_lst[0],
                               self.velx_lst[0], self.vely_lst[0], self.velw_lst[0]] 
+        self.t = self.t_lst[-1]
+        
         #print(self.t_lst)
         #print(self.initial_state)
     
     def QuaternionToEuler(self, intput_data, angle_is_rad = True):
         # change angle vale to radian if False
     
-        w = intput_data[0] 
-        y = intput_data[1]    # x
-        z = intput_data[2]    # y
-        x = intput_data[3]    # z
+        w0 = intput_data[0] 
+        y0 = intput_data[1]    # x
+        z0 = intput_data[2]    # y
+        x0 = intput_data[3]    # z
     
-        r = math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
-        p = math.asin(2 * (w * y - z * x))
-        y = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+        r = math.atan2(2 * (w0 * x0 + y0 * z0), 1 - 2 * (x0 * x0 + y0 * y0))
+        p = math.asin(2 * (w0 * y0 - z0 * x0))
+        y = math.atan2(2 * (w0 * z0 + x0 * y0), 1 - 2 * (y0 * y0 + z0 * z0))
     
         if not angle_is_rad: # pi -> 180
     
             r = r / math.pi * 180
             p = p / math.pi * 180
             y = y / math.pi * 180
-    
+
+        # print("y: ", y)
+        # if y < -1.5:
+        #     print("y: ", y, "\t quat: ", w0, y0, z0, x0)
+        #     print("r: ", r, "\t p: ", p, "\t y: ", y)
         return [r,p,y]
     
     def getXYW(self, row):
         qx1, qy1, qz1, qw1 = eval(row[2]), eval(row[3]), eval(row[4]), eval(row[5])
         q1 = [qw1, qx1, qy1, qz1]
         w =  self.QuaternionToEuler(q1)[2]
+        # if w < 0:
+        #     print("q1: ", q1)
         x = eval(row[8])
         y = eval(row[6])
         return x, y, w
@@ -172,19 +197,25 @@ class Trial:
         # W is the weight
         if len(Ve) == len(Vs):
             error = np.array([])
+            i = 0
             for ve, vs in zip(Ve, Vs):
                 e = np.array([i - j for i,j in zip(ve,vs)])
+                # if e[2] > 10:
+                # print("e: ", e, "\t i: ", i)
                 error = np.append(error, np.dot(np.dot(e, W), e.T))
+                i += 1
+
+            # print("error: ", error)
             
             return error.sum()
         else:
             print("Wrong velocity dimension!")
             return 0
     
-    def trial(self, w = [1,1,1]): 
+    def trial(self, w = [1,1,0.01]): 
         # new a USVmodel
-        init_vel = self.InertvToBodyv(self.initial_state[3:6], self.initial_state[2])
-        USV = USVmodel(self.initial_state[0:3], init_vel, self.extension)    
+        # init_vel = self.InertvToBodyv(self.initial_state[3:6], self.initial_state[2])
+        USV = USVmodel(self.initial_state[0:3], self.initial_state[3:6], self.extension)    
         
         # set parameter
         USV.setMass(self.mass)
@@ -201,6 +232,11 @@ class Trial:
         # prepare data
         Vel_exp = [[i,j,k] for i,j,k in zip(self.velx_lst, self.vely_lst, self.velw_lst)]
         Vel_sim = USV.state_history[:, 3:6].tolist()
+        # print("vel_sim: ", Vel_sim)
+        # l = len(Vel_exp)
+        # for idx in range(l):
+        #     print("exp: ", Vel_exp[idx][2])
+        #     print("sim: ", Vel_sim[idx][2])
         self.x_sim_lst = USV.state_history[:, 0].tolist()
         self.y_sim_lst = USV.state_history[:, 1].tolist()
         self.w_sim_lst = USV.state_history[:, 2].tolist()
@@ -220,9 +256,10 @@ class Trial:
                 fc=color, ec=color)
     
     def showFigures(self):
+        plt.figure(self.path)
         plt.text(self.initial_state[0], self.initial_state[1], "Origin")
         # draw Arrow
-        arrow_scale = 0.001
+        arrow_scale = 0.01
         x_span = np.max(self.x_lst) - np.min(self.x_lst)
         y_span = np.max(self.y_lst) - np.min(self.y_lst)
         arrow_scale *= np.min([x_span, y_span])
@@ -236,7 +273,13 @@ class Trial:
         plt.plot(self.x_lst, self.y_lst, label="Experiment")
         plt.plot(self.x_sim_lst, self.y_sim_lst, label="Simulation")
         plt.legend()
-        plt.show()
+        # plt.show()
+
+    def showAngle(self):
+        plt.figure(self.path)
+        plt.plot(self.w_lst, label="Exp")
+        plt.plot(self.w_sim_lst, label="Sim")
+        plt.legend()
         
 # Test script
 if __name__ == "__main__":
@@ -250,17 +293,37 @@ if __name__ == "__main__":
     file_name = "Take 2021-06-13 06.40.43 PM_013.csv"
     
     # entity the simulation
-    trial = Trial(root_dir + ext_dir[0] + exp_type_dir[2] + l_set_dir[0] + exp_name + file_name)
+    # trial = Trial(root_dir + ext_dir[0] + exp_type_dir[2] + l_set_dir[0] + exp_name + file_name)
     
+    # file_name = "./Data/USV/Extension_0/Spinning/Clockwise/PWM1_120_PWM2_120_PWM3_60_PWM4_60/Take 2021-06-13 06.40.43 PM_023.csv"
+    # file_name = "./Data/USV/Extension_0/Spinning/Anticlockwise/PWM1_60_PWM2_60_PWM3_120_PWM4_120/Take 2021-06-13 06.40.43 PM_021.csv"
+    # file_name = "./Data/USV/Extension_0/Spinning/Anticlockwise/PWM1_70_PWM2_70_PWM3_110_PWM4_110/Take 2021-06-13 06.40.43 PM_022.csv"
+    # file_name = "./Data/USV/Extension_0/Spinning/Clockwise/PWM1_110_PWM2_110_PWM3_70_PWM4_70/Take 2021-06-13 06.40.43 PM_024.csv"
+    # file_name = "./Data/USV/Extension_0/Circle/Clockwise/PWM1_0_PWM2_65_PWM3_0_PWM4_60/Take 2021-06-13 06.40.43 PM_019.csv"
+    file_name = "./Data/USV/Extension_0/Circle/Anticlockwise/PWM1_0_PWM2_60_PWM3_0_PWM4_65/Take 2021-06-13 06.40.43 PM_017.csv"
+    # file_name = "./Data/USV/Extension_0/Circle/Clockwise/PWM1_0_PWM2_65_PWM3_0_PWM4_60/Take 2021-06-13 06.40.43 PM_019.csv"
+    # file_name = "./Data/USV/Extension_0/StraightLine/Backward/PWM1_0_PWM2_130_PWM3_0_PWM4_130/Take 2021-06-13 06.40.43 PM_015.csv"
+    # file_name = "./Data/USV/Extension_0/StraightLine/Rightward/PWM1_70_PWM2_0_PWM3_70_PWM4_0/Take 2021-06-13 06.40.43 PM_012.csv"
+    trial = Trial(file_name)
     #OASES.setMass(2, 1, 1.2)
     #OASES.setDrag(0.02, 0.01, 0.02)
     
     #
     #sim.expFiles()
     #sim.readCSV(sim.files[0])
-    # trial.setParameters([40, 40, 12, 2, 2, 2])
-    trial.setParameters([30, 60, 150, 50, 40, 60])
-    trial.trial()
+    # trial.setParameters([41.9, 41.9, 1960000, 27.49, 27.49, -156500])
+    # trial.setParameters([41.9, 41.9, 150, 27.49, 27.49, 60])
+    trial.setParameters([41.9, 41.9, 385000, 27.49, 27.49, -28000])
+    # trial.setParameters([37.5683254, 56.24252949, 88.67227952, 3.24811066, 3.23008923, 40])
+    trial.trial([1, 1, 1])
     print(trial.error)
-    trial.showFigures()
+    print("t: ", trial.t)
+    print(len(trial.t_lst))
+    plt.plot(trial.w_lst, label="Exp")
+    # plt.plot(trial.w_sim_lst, label="Sim")
+    # plt.legend()
+    # trial.showAngle()
+    # print("exp origin w:")
+    # trial.showFigures()
+    plt.show()
     

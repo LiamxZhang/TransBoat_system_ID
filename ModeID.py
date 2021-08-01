@@ -14,6 +14,9 @@ import random
 from Episode import Episode
 import matlab.engine
 
+g_root_dir = "./Data/USV/"
+g_ext_dir = ["Extension_0/", "Extension_10/", "Extension_20/", "Extension_30/", "Extension_40/", "Extension_50/"]
+g_episode = Episode(g_root_dir + g_ext_dir[0])
 
 class ModeID:
     # ID for one extension mode
@@ -26,6 +29,8 @@ class ModeID:
         self.error_lst = []
     
     def setBound(self,lbd, ubd):
+        # if len(lbd) == 2:
+        #     self.lower_bound = np.array([41.9, 41.9, lbd])
         self.lower_bound = np.array(lbd)   # lower bounds: m1, m2, m3, d1, d2, d3
         self.upper_bound = np.array(ubd)   # upper bounds: m1, m2, m3, d1, d2, d3
     
@@ -113,7 +118,7 @@ class ModeID:
         # save to variables
         return err_min
     
-    def GDsearch(self, e = 10**(-5)): # accuracy
+    def GDsearch(self, e = 10**(-3)): # accuracy
         # GD method
         # Stopping criterion (for one search): 
         # Distance between two steps are short enough to converge
@@ -121,7 +126,7 @@ class ModeID:
         # Two consecutive searches converge to the same place
         # (points which are close enough)
         # Every search starts from a random point inside [lbd, ubd]
-                
+
         config_prev = np.zeros(self.N_para)
         i = 0
         print("+++++++ Gradient Descent Method ++++++++")
@@ -145,17 +150,50 @@ class ModeID:
                 j += 1
                 # store current value of error
                 err = self.f(x)
+                print("error: ", err)
+                if np.isnan(err):
+                    print("Encountered invalid value of f(x). Start the iteration again.")
+                    break
                 self.error_lst.append(err)
                 # Descent direction
-                d = - getGradient(self.f, x)
+                d = - getGradient2(self.f, x)
                 print("| Step: ", j, " | d: ", d)
                 # Backtracking line search
                 t = 1
-                while (self.f(self.config + t * d) > self.f(self.config) + alpha * t * (-d) * d).all():
-                    t = beta * t
-            
-                x_next = x + t * d
-                for k in range(6):
+                # err_next = self.f(self.config + t * d)
+                # while (err_next > err + alpha * t * (-d) * d).all():
+                #     t = beta * t
+                #     err_next = self.f(self.config + t * d)
+                # err_next_lst = []
+                # t_lst = []
+                while True:
+                    if t < 10**(-5):
+                        # x_next = x
+                        print("Stepsize too small ...")
+                        # i_next = np.argmin(err_next_lst)
+                        # t = t_lst[i_next]
+                        # print("Choose t: ", t)
+                        # print("Next err: ", err_next)
+                        break
+                    err_next = self.f(x + t * d)
+                    print("| Attempted next config: ", x + t * d, " \t | t: ", t)
+                    # err_next_lst.append(err_next)
+                    # t_lst.append(t)
+                    # check nan
+                    if np.isnan(err_next):
+                        print("Encountered invalid value of f(x_next). Smaller stepsize will be chosen.")
+                        t = beta * t
+                        continue
+                    # print("d * d: ", np.sum((-d)*d))
+                    # print("err: ", err, "err delta: ", alpha * t * np.sum((-d) * d))
+                    # print("sum: ", err + alpha * t * np.sum((-d) * d))
+                    if (err_next > err + alpha * t * np.sum((-d) * d)):
+                        t = beta * t
+                        print("| t = ", t, " \t | Attempt next f(x): ", err_next, " \t |")
+                    else:
+                        break
+                x_next = x + 10 * t * d
+                for k in range(2):
                     if x_next[k] < self.lower_bound[k]:
                         x_next[k] = self.lower_bound[k]
                     elif x_next[k] > self.upper_bound[k]:
@@ -187,10 +225,14 @@ class ModeID:
                 return err_min
     
     def TRRsearch(self):
+        print("+++++++ Trust Region Reflective Method ++++++++")
+        print("-----------------------------------------------")
+
         lb = matlab.double(list(self.lower_bound))
         ub = matlab.double(list(self.upper_bound))
 
         eng = matlab.engine.start_matlab()
+        print("Start TRR solver...")
         rslt = eng.TRR_Solver(lb, ub)
         config = np.array(rslt[0][0:6])
         err_min = np.array(rslt[0][6])
@@ -200,32 +242,39 @@ class ModeID:
     def configInit(self):
         # Generate 6 random configs, return in a np array
         c = np.array([])
-        for idx in range(6):
+        for idx in range(2):
             rand_num = self.lower_bound[idx] + random.random() * (self.upper_bound[idx] - self.lower_bound[idx])
             c = np.append(c, rand_num)
         return c
     
     def f(self, config):  # get error
-        config = np.array(config)
+        x = [41.9, 41.9, config[0], 27.49, 27.49, config[1]]
+        config = np.array(x)
         self.episode.setParameters(config.tolist())
         self.episode.run()
+        # print("x: ", config)
+        # print("f(x): ", self.episode.error)
         return self.episode.error
     
     def ID(self, acc_digit): # main function
         # check whether config file exists
         #if not self.readConfig():
         if True:
-            #self.GDsearch(acc_digit)
-            # self.GDsearch()
-            # t1 = time.time()
-            c, e = self.TRRsearch()
+            t1 = time.time()
+            ## Gradient Descent Method
+            e = self.GDsearch()
+
+            ## Trust Region Reflective Method
+            # c, e = self.TRRsearch()
+            # self.config = c
+
+            ## Brute Force Method
             # e = self.BFsearch(acc_digit)
-            self.config = c
-            # print("config: ", c)
+
             print("config: ", self.config)
             print("error: ", e)
-            # t2 = time.time()
-            # print("Used time: ", t2-t1)
+            t2 = time.time()
+            print("Used time: ", t2-t1)
             # save to configuration file
             # np.savetxt("./Configurations/Extension_" + str(self.extension) + ".csv", self.config, delimiter=",")
 
@@ -237,16 +286,17 @@ class ModeID:
         
         
 def f(config):  # get error
+    global g_episode
     config = np.array(config)
-    root_dir = "./Data/USV/"
-    ext_dir = ["Extension_0/", "Extension_10/", "Extension_20/", "Extension_30/", "Extension_40/", "Extension_50/"]
-    episode = Episode(root_dir + ext_dir[0])
-    episode.setParameters(config.tolist())
-    episode.run()
-    return episode.error
+    g_episode.setParameters(config.tolist())
+    g_episode.run()
+    # print("x: ", config)
+    # print("f(x): ", episode.error)
+    return g_episode.error
 
 def getGradient(func, x):
     # Calculate gradient at point x by differencing
+    x = [41.9, 41.9, x[0], 27.49, 27.49, x[1]]
     x = np.array(x)
     delta = 0.01
     N = 6
@@ -260,10 +310,26 @@ def getGradient(func, x):
         grad_lst[i] = grad
     return grad_lst
 
+def getGradient2(func, x):
+    # Calculate gradient at point x by differencing
+    # x = [41.9, 41.9, x[0], 27.49, 27.49, x[1]]
+    x = np.array(x)
+    delta = 0.01
+    N = 2
+    grad_lst = np.zeros(N)
+    for i in range(N):
+        delta_x = np.zeros(N)
+        delta_x[i] = delta
+        f1 = func(x - delta_x)
+        f2 = func(x + delta_x)
+        grad = (f2 - f1) / (2 * delta)
+        grad_lst[i] = grad
+    return grad_lst
+
 def getHessian(func, x):
     # Calculate the Hessain matrix
     x = np.array(x)
-    delta = 0.01
+    delta = 0.1
     N = 6
     hessian = np.zeros((N, N))
     for i in range(N):
@@ -280,9 +346,12 @@ def getHessian(func, x):
 if __name__ == "__main__":
     #
     root_dir = "./Data/USV/Extension_0/"
-    
-    lbd = [30., 30., 70., 1., 3., 2.]
-    ubd = [60., 60., 100., 5., 4., 6.]
+    # lbd = [30., 30., 10., 10., 10., 1.]
+    # lbd = [41.9, 41.9, 10., 27., 200., 100.]
+    # ubd = [41.9, 41.9, 200., 28., 1000., 600.]
+    # bound for m3 and d3
+    lbd = [10., 1.]
+    ubd = [200., 1000.]
     modeID = ModeID(root_dir, lbd, ubd)
     modeID.ID(0.01)
-    modeID.showFigures()
+    # modeID.showFigures()

@@ -16,8 +16,14 @@ class Episode:
     def __init__(self, extension_root):
         # 
         self.extension_root_dir = extension_root # "./Data/USV/Extension_0/"
-        self.PWM = []
-        self.files = []
+        # Initialize trials (read experiment data)
+        self.findAllTrials()
+        self.all_sim = []
+        for file in self.files:
+            sim = Trial(file)
+            self.all_sim.append(sim)
+        # self.PWM = []
+        # self.files = []
         
     # end
     
@@ -42,6 +48,8 @@ class Episode:
     
     def findAllTrials(self): # find all trials for one extension state
         # 3rd class
+        self.PWM = []
+        self.files = []
         exp_type_dirs = os.listdir(self.extension_root_dir)
         # print("exp_type_dirs: ", exp_type_dirs)
         for exp_type_dir in exp_type_dirs:
@@ -60,23 +68,40 @@ class Episode:
         self.parameters = parameters
         
     def run(self):
-        self.findAllTrials()
+        # if not self.readFiles:
+        #     self.findAllTrials()
+        #     self.all_sim = []
+        #     for file in self.files:
+        #         sim = Trial(file)
+        #         self.all_sim.append(sim)
+        #     self.readFiles = True
         self.error_lst = np.array([])
-        for file in self.files:
-            #
-            sim = Trial(file)
+        for sim in self.all_sim:
+            # print(file)
+            # sim = Trial(file)
             sim.setParameters(self.parameters)
-            sim.trial()
+            if "Spinning" in sim.path:
+                sim.trial([1, 1, 0.5])
+                sim.showAngle()
+            else:
+                sim.trial([1, 1, 1])
+                sim.showFigures()
+            # plt.figure(file)
+            # plt.plot(sim.w_lst)
+            # sim.trial([1, 1, 1])
             self.error_lst = np.append(self.error_lst, sim.error)
         self.error = self.error_lst.sum()
         #print("Model error:  ", self.error)
 
     def showFigures(self):
+        plt.figure("episode")
         L = len(self.error_lst)
         # print(L)
         print(self.error_lst)
         x = list(range(1, L+1))
         plt.bar(x, self.error_lst)
+        plt.ylabel("Error")
+        # plt.title("Equal weight: [1, 1, 1]")
         plt.show()
     
 # Test script
@@ -90,13 +115,41 @@ if __name__ == "__main__":
     exp_name = "PWM1_0_PWM2_110_PWM3_0_PWM4_110/"
     file_name = "Take 2021-06-13 06.40.43 PM_013.csv"
     
-    episode = Episode(root_dir + ext_dir[0])
     # episode.setParameters([40, 40, 12, 2, 2, 2])
-    episode.setParameters([30, 60, 150, 50, 40, 60])
+    # episode.setParameters([30, 60, 150, 50, 40, 60])
+    # err_lst = []
+    # x_lst = []
+    # episode = Episode(root_dir + ext_dir[0])
+    # for i in range(20):
+    #     x = 500 + 50 * i
+    #     # y = -155000 - 100 * i
+    #     x_lst.append(x)
+    #     episode.setParameters([41.9, 41.9, 860, 27.49, 27.49, 180])
+    #     t1 = time.time()
+    #     episode.run()
+    #     t2 = time.time()
+    #     err_lst.append(episode.error)
+    #     print("error", episode.error)
+    #     print("x: ", x)
+    #     # print("y: ", y)
+    #     print("used time: ", t2-t1)
+    # plt.plot(x_lst, err_lst)
+    # plt.xlabel("x")
+    # plt.ylabel("Error")
+    # plt.title("m1 = 41.9, m2 = 41.9, m3 = x, d1 = 27.49, d2 = 27.49, d3 = 180")
+    # plt.show()
+
+    episode = Episode(root_dir + ext_dir[0])
+    episode.setParameters([41.9, 41.9, 860, 27.49, 27.49, 180])
+    # episode.setParameters([41.9, 41.9, 385000, 27.49, 27.49, -28000])
+    
+    # episode.setParameters([41.90259446, 60., 199.98714965, 27.49310886, 600., 445.24579278])
+    # episode.setParameters([41.90259446, 30., 10., 27.49310886, 200., 100.])
+    # episode.setParameters([41.9, 41.9, 1960000, 27.49, 27.49, -156500])
     t1 = time.time()
     episode.run()
     t2 = time.time()
     print("error", episode.error)
     print("used time: ", t2-t1)
     episode.showFigures()
-    
+
