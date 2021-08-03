@@ -9,13 +9,12 @@ import csv
 import math
 import numpy as np
 from matplotlib import pyplot as plt
-from numpy.lib.twodim_base import tri
 from USVmodel import USVmodel
 
 
 class Trial: 
     # one single trial of experiment
-    def __init__(self, path):
+    def __init__(self, path, valU = 10, valL = -10):
         self.path = path
         # get the extension information
         self.extension = int(path.split("/")[3].split("_")[1])
@@ -25,9 +24,9 @@ class Trial:
         #print(self.PWM)
         # get all data
         t_e = 10   # time: s
-        self.readCSV(path, t_e)
+        self.readCSV(path, t_e, valU, valL)
     
-    def readCSV(self, file_path, end_t = 10):
+    def readCSV(self, file_path, end_t = 10, valU = 10, valL = -10):
         # read csv files to obtain the initial state and the time list
         header = 7 # jump the header
         deque_length = 10 # jump the first data
@@ -45,6 +44,9 @@ class Trial:
         self.velw_lst = []
         
         self.state_deque = []
+
+        self.rowToBeEdited = []     # Row index
+        self.EulerToBeEdited = []   # List of y, p, r to be edited
         
         with open(file_path, newline='') as csv_f:
             f_reader = csv.reader(csv_f)
@@ -71,9 +73,7 @@ class Trial:
                     self.t = end_t
                     break
 
-                x, y, w = self.getXYW(row)
-                # if w < -1.5:
-                #     print("w: ", w, "\t row i: ", row_i, "\t t: ", t)
+                x, y, w, r0, p0, y0 = self.getXYW(row)
                 
                 # skip the first 10 data
                 if data_i <= deque_length:
@@ -114,6 +114,13 @@ class Trial:
                 if t <= skip_sec: 
                     continue
                 
+                # to be edit
+                if w < valL or w > valU:
+                    self.rowToBeEdited.append(row_i)
+                    print("w: ", w, "\t row i: ", row_i, "\t t: ", t)
+                    self.EulerToBeEdited.append([y0, p0, r0])
+                    print("r: ", r0, "\t p: ", p0, "\t y: ", y0)
+                    
                 t, x, y, w = self.state_deque[int(deque_length/2)]
                 # for after the first second
                 self.t_lst.append(t)
@@ -159,20 +166,19 @@ class Trial:
             y = y / math.pi * 180
 
         # print("y: ", y)
-        # if y < -1.5:
-        #     print("y: ", y, "\t quat: ", w0, y0, z0, x0)
-        #     print("r: ", r, "\t p: ", p, "\t y: ", y)
+#        if y < 1.32:
+#            print("y: ", y, "\t quat: ", w0, y0, z0, x0)
+#            print("r: ", r, "\t p: ", p, "\t y: ", y)
         return [r,p,y]
     
     def getXYW(self, row):
         qx1, qy1, qz1, qw1 = eval(row[2]), eval(row[3]), eval(row[4]), eval(row[5])
         q1 = [qw1, qx1, qy1, qz1]
         w =  self.QuaternionToEuler(q1)[2]
-        # if w < 0:
-        #     print("q1: ", q1)
         x = eval(row[8])
         y = eval(row[6])
-        return x, y, w
+        r0, p0, y0 = self.QuaternionToEuler(q1)
+        return x, y, w, r0, p0, y0
     
     def InertvToBodyv(self, inertial_v, w):
         # inertial_v is a list
@@ -300,10 +306,52 @@ if __name__ == "__main__":
     # file_name = "./Data/USV/Extension_0/Spinning/Anticlockwise/PWM1_70_PWM2_70_PWM3_110_PWM4_110/Take 2021-06-13 06.40.43 PM_022.csv"
     # file_name = "./Data/USV/Extension_0/Spinning/Clockwise/PWM1_110_PWM2_110_PWM3_70_PWM4_70/Take 2021-06-13 06.40.43 PM_024.csv"
     # file_name = "./Data/USV/Extension_0/Circle/Clockwise/PWM1_0_PWM2_65_PWM3_0_PWM4_60/Take 2021-06-13 06.40.43 PM_019.csv"
-    file_name = "./Data/USV/Extension_0/Circle/Anticlockwise/PWM1_0_PWM2_60_PWM3_0_PWM4_65/Take 2021-06-13 06.40.43 PM_017.csv"
+    # file_name = "./Data/USV/Extension_0/Circle/Anticlockwise/PWM1_0_PWM2_60_PWM3_0_PWM4_65/Take 2021-06-13 06.40.43 PM_017.csv"
     # file_name = "./Data/USV/Extension_0/Circle/Clockwise/PWM1_0_PWM2_65_PWM3_0_PWM4_60/Take 2021-06-13 06.40.43 PM_019.csv"
     # file_name = "./Data/USV/Extension_0/StraightLine/Backward/PWM1_0_PWM2_130_PWM3_0_PWM4_130/Take 2021-06-13 06.40.43 PM_015.csv"
     # file_name = "./Data/USV/Extension_0/StraightLine/Rightward/PWM1_70_PWM2_0_PWM3_70_PWM4_0/Take 2021-06-13 06.40.43 PM_012.csv"
+    
+    # file_name = "./Data/USV/Extension_10/StraightLine/Forward/PWM1_0_PWM2_70_PWM3_0_PWM4_70/Take 2021-07-09 18.50.59 AM_004.csv"
+    # file_name = "./Data/USV/Extension_10/StraightLine/Rightward/PWM1_40_PWM2_0_PWM3_40_PWM4_0/Take 2021-07-09 18.50.59 AM_013.csv"
+    # file_name = "./Data/USV/Extension_20/Spinning/Clockwise/PWM1_110_PWM2_110_PWM3_70_PWM4_70/Take 2021-07-09 18.50.59 AM_025.csv"
+    # file_name = "./Data/USV/Extension_20/StraightLine/Rightward/PWM1_50_PWM2_0_PWM3_50_PWM4_0/Take 2021-07-09 18.50.59 AM_014.csv"
+    # file_name = "./Data/USV/Extension_20/StraightLine/Forward/PWM1_0_PWM2_50_PWM3_0_PWM4_50/Take 2021-07-09 18.50.59 AM_002.csv"
+    # file_name = "./Data/USV/Extension_20/StraightLine/Rightward/PWM1_40_PWM2_0_PWM3_40_PWM4_0/Take 2021-07-09 18.50.59 AM_013.csv"
+    
+    # file_name = "./Data/USV/Extension_30/StraightLine/Rightward/PWM1_70_PWM2_0_PWM3_70_PWM4_0/Take 2021-07-09 18.50.59 AM_016.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Rightward/PWM1_60_PWM2_0_PWM3_60_PWM4_0/Take 2021-07-09 18.50.59 AM_015.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Rightward/PWM1_50_PWM2_0_PWM3_50_PWM4_0/Take 2021-07-09 18.50.59 AM_014.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Forward/PWM1_0_PWM2_50_PWM3_0_PWM4_50/Take 2021-07-09 18.50.59 AM_002.csv"
+    # file_name = "./Data/USV/Extension_30/Spinning/Clockwise/PWM1_120_PWM2_120_PWM3_60_PWM4_60/Take 2021-07-09 18.50.59 AM_026.csv"
+    # file_name = "./Data/USV/Extension_30/Spinning/Anticlockwise/PWM1_60_PWM2_60_PWM3_120_PWM4_120/Take 2021-07-09 18.50.59 AM_023.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Rightward/PWM1_40_PWM2_0_PWM3_40_PWM4_0/Take 2021-07-09 18.50.59 AM_013.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Forward/PWM1_0_PWM2_40_PWM3_0_PWM4_40/Take 2021-07-09 18.50.59 AM_001.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Backward/PWM1_0_PWM2_130_PWM3_0_PWM4_130/Take 2021-07-09 18.50.59 AM_007.csv"
+    # file_name = "./Data/USV/Extension_30/StraightLine/Backward/PWM1_0_PWM2_120_PWM3_0_PWM4_120/Take 2021-07-09 18.50.59 AM_006.csv"
+
+    # file_name = "./Data/USV/Extension_40/Spinning/Anticlockwise/PWM1_60_PWM2_60_PWM3_120_PWM4_120/Take 2021-07-09 18.50.59 AM_024.csv"
+    # file_name = "./Data/USV/Extension_40/Spinning/Anticlockwise/PWM1_70_PWM2_70_PWM3_110_PWM4_110/Take 2021-07-09 18.50.59 AM_025.csv"
+    # file_name = "./Data/USV/Extension_40/Spinning/Clockwise/PWM1_120_PWM2_120_PWM3_60_PWM4_60/Take 2021-07-09 18.50.59 AM_027.csv"
+    # file_name = "./Data/USV/Extension_40/Circle/Anticlockwise/PWM1_0_PWM2_54_PWM3_0_PWM4_60/Take 2021-07-09 18.50.59 AM_020.csv"
+    # file_name = "./Data/USV/Extension_40/Circle/Anticlockwise/PWM1_0_PWM2_59_PWM3_0_PWM4_65/Take 2021-07-09 18.50.59 AM_017.csv"
+    # file_name = "./Data/USV/Extension_40/Circle/Anticlockwise/PWM1_0_PWM2_64_PWM3_0_PWM4_70/Take 2021-07-09 18.50.59 AM_019.csv"
+    # file_name = "./Data/USV/Extension_40/Circle/Clockwise/PWM1_0_PWM2_60_PWM3_0_PWM4_55/Take 2021-07-09 18.50.59 AM_021.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Rightward/PWM1_70_PWM2_0_PWM3_70_PWM4_0/Take 2021-07-09 18.50.59 AM_016.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Leftward/PWM1_120_PWM2_0_PWM3_120_PWM4_0/Take 2021-07-09 18.50.59 AM_010.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Forward/PWM1_0_PWM2_60_PWM3_0_PWM4_60/Take 2021-07-09 18.50.59 AM_002.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Backward/PWM1_0_PWM2_130_PWM3_0_PWM4_130/Take 2021-07-09 18.50.59 AM_006.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Backward/PWM1_0_PWM2_120_PWM3_0_PWM4_120/Take 2021-07-09 18.50.59 AM_005.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Rightward/PWM1_60_PWM2_0_PWM3_60_PWM4_0/Take 2021-07-09 18.50.59 AM_015.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Rightward/PWM1_40_PWM2_0_PWM3_40_PWM4_0/Take 2021-07-09 18.50.59 AM_013.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Leftward/PWM1_140_PWM2_0_PWM3_140_PWM4_0/Take 2021-07-09 18.50.59 AM_012.csv"
+    # file_name = "./Data/USV/Extension_40/StraightLine/Leftward/PWM1_130_PWM2_0_PWM3_130_PWM4_0/Take 2021-07-09 18.50.59 AM_011.csv"
+
+    # file_name = "./Data/USV/Extension_50/Circle/Clockwise/PWM1_0_PWM2_60_PWM3_0_PWM4_55/Take 2021-06-13 06.40.43 PM_045.csv"
+    # file_name = "./Data/USV/Extension_50/Spinning/Anticlockwise/PWM1_60_PWM2_60_PWM3_120_PWM4_120/Take 2021-06-13 06.40.43 PM_046.csv"
+    # file_name = "./Data/USV/Extension_50/Spinning/Anticlockwise/PWM1_70_PWM2_70_PWM3_110_PWM4_110/Take 2021-06-13 06.40.43 PM_047.csv"
+    # file_name = "./Data/USV/Extension_50/Spinning/Clockwise/PWM1_110_PWM2_110_PWM3_70_PWM4_70/Take 2021-06-13 06.40.43 PM_049.csv"
+    # file_name = "./Data/USV/Extension_50/Spinning/Clockwise/PWM1_120_PWM2_120_PWM3_60_PWM4_60/Take 2021-06-13 06.40.43 PM_048.csv"
+    
     trial = Trial(file_name)
     #OASES.setMass(2, 1, 1.2)
     #OASES.setDrag(0.02, 0.01, 0.02)
@@ -313,7 +361,7 @@ if __name__ == "__main__":
     #sim.readCSV(sim.files[0])
     # trial.setParameters([41.9, 41.9, 1960000, 27.49, 27.49, -156500])
     # trial.setParameters([41.9, 41.9, 150, 27.49, 27.49, 60])
-    trial.setParameters([41.9, 41.9, 385000, 27.49, 27.49, -28000])
+    trial.setParameters([41.9, 41.9, 860, 27.49, 27.49, 180])
     # trial.setParameters([37.5683254, 56.24252949, 88.67227952, 3.24811066, 3.23008923, 40])
     trial.trial([1, 1, 1])
     print(trial.error)

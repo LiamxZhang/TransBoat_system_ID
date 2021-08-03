@@ -77,7 +77,7 @@ class Episode:
         #     self.readFiles = True
         self.error_lst = np.array([])
         for sim in self.all_sim:
-            # print(file)
+            print(sim.path)
             # sim = Trial(file)
             sim.setParameters(self.parameters)
             if "Spinning" in sim.path:
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     # plt.title("m1 = 41.9, m2 = 41.9, m3 = x, d1 = 27.49, d2 = 27.49, d3 = 180")
     # plt.show()
 
-    episode = Episode(root_dir + ext_dir[0])
+    episode = Episode(root_dir + ext_dir[5])
     episode.setParameters([41.9, 41.9, 860, 27.49, 27.49, 180])
     # episode.setParameters([41.9, 41.9, 385000, 27.49, 27.49, -28000])
     
